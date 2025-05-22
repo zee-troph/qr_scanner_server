@@ -7,7 +7,14 @@ import '../lib/utils/socket_listener.dart';
 /// Attendance server that manages users (with passwords), admins,
 /// QR sessions, and attendance records over WebSocket. {$ECUR3_PA55W0RD}
 void main(List<String> args) async {
-  final uri = Uri.parse(Platform.environment['DATABASE_URI']!);
+  final dbUrl = Platform.environment['DATABASE_URL'];
+  if (dbUrl == null) {
+    print('DATABASE_URL is not set.');
+    return;
+  } else {
+    print('Database URL: $dbUrl');
+  }
+  final uri = Uri.parse(dbUrl);
 
   final db = PostgreSQLConnection(
     uri.host,
