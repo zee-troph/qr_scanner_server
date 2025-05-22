@@ -2,6 +2,24 @@
   "configVersion": 2,
   "packages": [
     {
+      "name": "async",
+      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/async-2.13.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "buffer",
+      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/buffer-1.2.3",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "charcode",
+      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/charcode-1.4.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "collection",
       "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/collection-1.19.1",
       "packageUri": "lib/",
@@ -14,22 +32,10 @@
       "languageVersion": "3.4"
     },
     {
-      "name": "ffi",
-      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/ffi-2.1.4",
-      "packageUri": "lib/",
-      "languageVersion": "3.7"
-    },
-    {
       "name": "fixnum",
       "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/fixnum-1.1.1",
       "packageUri": "lib/",
       "languageVersion": "3.1"
-    },
-    {
-      "name": "js",
-      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/js-0.6.7",
-      "packageUri": "lib/",
-      "languageVersion": "2.19"
     },
     {
       "name": "meta",
@@ -44,22 +50,58 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "pool",
+      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/pool-1.5.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "postgres",
+      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/postgres-2.6.4",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "sasl_scram",
+      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/sasl_scram-0.1.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "saslprep",
+      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/saslprep-1.0.3",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "sprintf",
       "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/sprintf-7.0.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
     {
-      "name": "sqlite3",
-      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/sqlite3-1.11.2",
+      "name": "stack_trace",
+      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/stack_trace-1.12.1",
       "packageUri": "lib/",
-      "languageVersion": "2.18"
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "stream_channel",
+      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/stream_channel-2.1.4",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
     },
     {
       "name": "typed_data",
       "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/typed_data-1.4.0",
       "packageUri": "lib/",
       "languageVersion": "3.5"
+    },
+    {
+      "name": "unorm_dart",
+      "rootUri": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache/hosted/pub.dev/unorm_dart-0.3.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
     },
     {
       "name": "uuid",
@@ -74,7 +116,7 @@
       "languageVersion": "2.12"
     }
   ],
-  "generated": "2025-05-22T22:13:44.607816Z",
+  "generated": "2025-05-22T22:33:25.220814Z",
   "generator": "pub",
   "generatorVersion": "3.7.2",
   "pubCache": "file:///C:/Users/Adedo%20Akintunde/AppData/Local/Pub/Cache"

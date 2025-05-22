@@ -1,13 +1,25 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
-import 'package:sqlite3/sqlite3.dart';
+import 'package:postgres/postgres.dart';
 import '../lib/utils/socket_listener.dart';
 
 /// Attendance server that manages users (with passwords), admins,
 /// QR sessions, and attendance records over WebSocket. {$ECUR3_PA55W0RD}
 void main(List<String> args) async {
-  final db = sqlite3.open('attendance.db');
+  final uri = Uri.parse(Platform.environment['DATABASE_URI']!);
+
+  final db = PostgreSQLConnection(
+    uri.host,
+    uri.port,
+    uri.pathSegments.first,
+    username: uri.userInfo.split(':')[0],
+    password: uri.userInfo.split(':')[1],
+    useSSL: true,
+  );
+
+  await db.open();
+
   print('[DB] Database opened.');
   _createSchema(db);
 
@@ -52,76 +64,19 @@ void main(List<String> args) async {
   print('[Server] Server running on port 8080');
 }
 
-/// Handles request to retrieve all sessions for a given admin
-void _handleRequestSessions(
-  Database db,
-  Map<String, dynamic> p,
-  Socket socket,
-  SocketManager m,
-) {
-  final adminId = p['admin_id'] as String;
+/// --- UTILITY FUNCTIONS ---
 
-  final result = db.select(
-    '''
-    SELECT id, code, expires
-      FROM sessions
-     WHERE admin_id = ?
-  ''',
-    [adminId],
-  );
-
-  final sessionList = result
-      .map(
-        (row) => {
-          'session_id': row['id'],
-          'code': row['code'],
-          'expires': row['expires'],
-        },
-      )
-      .toList();
-
-  m.replyTo(p, {'command': 'session_list', 'sessions': sessionList}, socket);
+String _hashPassword(String password) {
+  final hash = sha256.convert(utf8.encode(password)).toString();
+  print('[Auth] Hashed password: $hash');
+  return hash;
 }
 
-/// Handles request to retrieve all attendances for a given session by session ID
-void _handleRequestAttendances(
-  Database db,
-  Map<String, dynamic> p,
-  Socket socket,
-  SocketManager m,
-) {
-  final sessionId = p['session_id'] as String;
+/// --- DB SCHEMA CREATION ---
 
-  // Query attendances for that session
-  final result = db.select(
-    '''
-    SELECT user_id, timestamp
-      FROM attendances
-     WHERE session_id = ?              -- ← filter by session_id
-  ''',
-    [sessionId],
-  );
-
-  // Build list of attendance JSON
-  final attendList = result
-      .map(
-        (row) => {'user_id': row['user_id'], 'timestamp': row['timestamp']},
-      )
-      .toList();
-
-  // Reply with inReplyTo automatically handled by replyTo
-  m.replyTo(
-      p,
-      {
-        'command': 'attendance_list',
-        'attendances': attendList,
-      },
-      socket);
-}
-
-void _createSchema(Database db) {
+Future<void> _createSchema(PostgreSQLConnection db) async {
   print('[DB] Creating schema if not exists...');
-  db.execute('''
+  await db.execute('''
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -140,10 +95,10 @@ void _createSchema(Database db) {
       FOREIGN KEY(admin_id) REFERENCES users(id)
     );
     CREATE TABLE IF NOT EXISTS attendances (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       session_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
-      qr_primary_key TEXT  NOT NULL,
+      qr_primary_key TEXT NOT NULL,
       timestamp TEXT NOT NULL,
       FOREIGN KEY(session_id) REFERENCES sessions(id),
       FOREIGN KEY(user_id) REFERENCES users(id)
@@ -152,79 +107,132 @@ void _createSchema(Database db) {
   print('[DB] Schema created.');
 }
 
-String _hashPassword(String password) {
-  final hash = sha256.convert(utf8.encode(password)).toString();
-  print('[Auth] Hashed password: $hash');
-  return hash;
-}
+/// --- HANDLERS ---
 
-void _handleCreateUser(
-  Database db,
+Future<void> _handleRequestSessions(
+  PostgreSQLConnection db,
   Map<String, dynamic> p,
   Socket socket,
   SocketManager m,
-) {
-  print('[User] Creating user: ${p['id']}');
+) async {
+  final adminId = p['admin_id'] as String;
+
+  final result = await db.mappedResultsQuery(
+    '''
+    SELECT id, code, expires FROM sessions WHERE admin_id = @adminId
+    ''',
+    substitutionValues: {'adminId': adminId},
+  );
+
+  final sessionList = result
+      .map((row) => {
+            'session_id': row['sessions']!['id'],
+            'code': row['sessions']!['code'],
+            'expires': row['sessions']!['expires'],
+          })
+      .toList();
+
+  m.replyTo(p, {'command': 'session_list', 'sessions': sessionList}, socket);
+}
+
+Future<void> _handleRequestAttendances(
+  PostgreSQLConnection db,
+  Map<String, dynamic> p,
+  Socket socket,
+  SocketManager m,
+) async {
+  final sessionId = p['session_id'] as String;
+
+  final result = await db.mappedResultsQuery(
+    '''
+    SELECT user_id, timestamp FROM attendances WHERE session_id = @sessionId
+    ''',
+    substitutionValues: {'sessionId': sessionId},
+  );
+
+  final attendList = result
+      .map((row) => {
+            'user_id': row['attendances']!['user_id'],
+            'timestamp': row['attendances']!['timestamp'],
+          })
+      .toList();
+
+  m.replyTo(
+      p,
+      {
+        'command': 'attendance_list',
+        'attendances': attendList,
+      },
+      socket);
+}
+
+Future<void> _handleCreateUser(
+  PostgreSQLConnection db,
+  Map<String, dynamic> p,
+  Socket socket,
+  SocketManager m,
+) async {
   final id = p['id'] as String;
   final name = p['name'] as String;
   final password = p['password'] as String;
   final hashed = _hashPassword(password);
 
-  final stmt = db.prepare('''
-      INSERT OR IGNORE INTO users (id,name,password) VALUES (?,?,?)
-  ''');
-  stmt.execute([id, name, hashed]);
-  stmt.dispose();
-  print('[User] User created or already exists: $id');
+  await db.execute(
+    '''
+    INSERT INTO users (id, name, password)
+    VALUES (@id, @name, @password)
+    ON CONFLICT (id) DO NOTHING
+    ''',
+    substitutionValues: {'id': id, 'name': name, 'password': hashed},
+  );
 
   m.replyTo(p, {'command': 'create_user_ack', 'id': id}, socket);
 }
 
-void _handleCreateAdmin(
-  Database db,
+Future<void> _handleCreateAdmin(
+  PostgreSQLConnection db,
   Map<String, dynamic> p,
   Socket socket,
   SocketManager m,
-) {
-  print('[Admin] Creating admin: ${p['id']}');
+) async {
   final id = p['id'] as String;
   final name = p['name'] as String;
   final password = p['password'] as String;
   final hashed = _hashPassword(password);
 
-  final stmt = db.prepare('''
-      INSERT OR IGNORE INTO admins (id,name,password) VALUES (?,?,?)
-  ''');
-  stmt.execute([id, name, hashed]);
-  stmt.dispose();
-  print('[Admin] Admin created or already exists: $id');
+  await db.execute(
+    '''
+    INSERT INTO admins (id, name, password)
+    VALUES (@id, @name, @password)
+    ON CONFLICT (id) DO NOTHING
+    ''',
+    substitutionValues: {'id': id, 'name': name, 'password': hashed},
+  );
 
   m.replyTo(p, {'command': 'create_admin_ack', 'id': id}, socket);
 }
 
-void _handleLogin(
-  Database db,
+Future<void> _handleLogin(
+  PostgreSQLConnection db,
   Map<String, dynamic> p,
   Socket socket,
   SocketManager m,
-) {
-  print('[Auth] Login attempt: ${p['id']}');
+) async {
   final id = p['id'] as String;
   final password = p['password'] as String;
-  final expectedRole = p['role'] as String;
+  final role = p['role'] as String;
   final hashed = _hashPassword(password);
 
-  final result = db.select(
+  final result = await db.mappedResultsQuery(
     '''
-      SELECT id,name FROM ${expectedRole}s
-      WHERE id = ? AND password = ?
-      ''',
-    [id, hashed],
+    SELECT id, name FROM ${role}s
+    WHERE id = @id AND password = @password
+    ''',
+    substitutionValues: {'id': id, 'password': hashed},
   );
 
   if (result.isNotEmpty) {
-    final row = result.first;
-    print('[Auth] Login successful: $id');
+    final row = result.first['${role}s']!;
     m.replyTo(
         p,
         {
@@ -232,11 +240,10 @@ void _handleLogin(
           'status': 'success',
           'id': row['id'],
           'name': row['name'],
-          'role': row['role'],
+          'role': role,
         },
         socket);
   } else {
-    print('[Auth] Login failed: $id');
     m.replyTo(
         p,
         {
@@ -248,27 +255,29 @@ void _handleLogin(
   }
 }
 
-void _handleCreateSession(
-  Database db,
+Future<void> _handleCreateSession(
+  PostgreSQLConnection db,
   Map<String, dynamic> p,
   Socket socket,
   SocketManager m,
-) {
+) async {
+  final sessionId = p['session_id'] as String;
   final adminId = p['admin_id'] as String;
   final code = p['code'] as String;
   final expires = p['expires'] as String;
 
-  print('[Session] Creating session for admin $adminId with code $code');
-
-  final stmt = db.prepare('''
-      INSERT INTO sessions (id,admin_id,code,expires) VALUES (?,?,?,?)
-  ''');
-  stmt.execute([p['session_id'] as String, adminId, code, expires]);
-  stmt.dispose();
-
-  final sessionId = p['session_id'] as String;
-
-  print('[Session] Session created with ID $sessionId');
+  await db.execute(
+    '''
+    INSERT INTO sessions (id, admin_id, code, expires)
+    VALUES (@id, @adminId, @code, @expires)
+    ''',
+    substitutionValues: {
+      'id': sessionId,
+      'adminId': adminId,
+      'code': code,
+      'expires': expires,
+    },
+  );
 
   m.replyTo(
       p,
@@ -281,29 +290,22 @@ void _handleCreateSession(
       socket);
 }
 
-void _handleAttendance(
-  Database db,
+Future<void> _handleAttendance(
+  PostgreSQLConnection db,
   Map<String, dynamic> p,
   Socket socket,
   SocketManager m,
-) {
+) async {
   final userId = p['user_id'] as String;
-  final sessionId = p['session_id'] as String; // session_id should be an int
-  final now = DateTime.now();
+  final sessionId = p['session_id'] as String;
+  final now = DateTime.now().toIso8601String();
 
-  print(
-    '[Attendance] User $userId attempting to mark attendance for session ID $sessionId',
-  );
-
-  final sel = db.select(
-    '''
-    SELECT code, expires FROM sessions WHERE id = ?
-  ''',
-    [sessionId],
+  final sel = await db.mappedResultsQuery(
+    'SELECT code, expires FROM sessions WHERE id = @sessionId',
+    substitutionValues: {'sessionId': sessionId},
   );
 
   if (sel.isEmpty) {
-    print('[Attendance] Invalid session ID: $sessionId');
     m.replyTo(
         p,
         {
@@ -314,22 +316,18 @@ void _handleAttendance(
     return;
   }
 
-  final row = sel.first;
-  final expiresTs = DateTime.parse(row['expires'] as String);
-  if (now.isAfter(expiresTs)) {
-    print('[Attendance] Session expired at $expiresTs');
+  final expiresTs = DateTime.parse(sel.first['sessions']!['expires']);
+  if (DateTime.now().isAfter(expiresTs)) {
     m.replyTo(p, {'command': 'attendance_nok', 'reason': 'expired'}, socket);
     return;
   }
 
-  final attendanceKey =
-      '$sessionId-$userId'; // could use this as a unique key if needed
-  final result = db.select(
+  final result = await db.query(
     '''
     SELECT 1 FROM attendances
-    WHERE session_id = ? AND user_id = ?
-  ''',
-    [sessionId, userId],
+    WHERE session_id = @sessionId AND user_id = @userId
+    ''',
+    substitutionValues: {'sessionId': sessionId, 'userId': userId},
   );
 
   if (result.isNotEmpty) {
@@ -340,26 +338,31 @@ void _handleAttendance(
           'reason': 'You have already signed the attendance previously',
         },
         socket);
-  } else {
-    final stmt = db.prepare('''
-      INSERT INTO attendances (qr_primary_key, session_id, user_id, timestamp)
-      VALUES (?, ?, ?, ?)
-    ''');
-    stmt.execute([attendanceKey, sessionId, userId, now.toIso8601String()]);
-    stmt.dispose();
-
-    print(
-      '[Attendance] Attendance recorded for user $userId in session $sessionId',
-    );
-
-    m.replyTo(
-        p,
-        {
-          'command': 'new_attendance',
-          'session_id': sessionId,
-          'user_id': userId,
-          'timestamp': now.toIso8601String(),
-        },
-        socket);
+    return;
   }
+
+  final attendanceKey = '$sessionId-$userId';
+
+  await db.execute(
+    '''
+    INSERT INTO attendances (qr_primary_key, session_id, user_id, timestamp)
+    VALUES (@key, @sessionId, @userId, @timestamp)
+    ''',
+    substitutionValues: {
+      'key': attendanceKey,
+      'sessionId': sessionId,
+      'userId': userId,
+      'timestamp': now,
+    },
+  );
+
+  m.replyTo(
+      p,
+      {
+        'command': 'new_attendance',
+        'session_id': sessionId,
+        'user_id': userId,
+        'timestamp': now,
+      },
+      socket);
 }
