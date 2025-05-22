@@ -4,6 +4,7 @@ FROM dart:stable AS build
 # Resolve app dependencies.
 WORKDIR /app
 COPY pubspec.* ./
+COPY .dockerignore .dockerignore 
 RUN dart pub get
 
 # Copy all source code
