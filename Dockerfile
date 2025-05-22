@@ -15,6 +15,12 @@ COPY . .
 # Compile server (optional depending on your style)
 RUN dart compile exe bin/qr_server.dart -o bin/qr_server
 
+# Create minimal runtime image
+FROM debian:bullseye-slim
+
+# Install just the SQLite runtime library in the final image
+RUN apt-get update && apt-get install -y sqlite3 libsqlite3-0 && rm -rf /var/lib/apt/lists/*
+
 # Build minimal serving image from AOT-compiled binary and required files
 FROM scratch
 COPY --from=build /runtime/ /
