@@ -22,7 +22,7 @@ class SocketManager {
     int port = 8080,
   }) async {
     _server = await ServerSocket.bind(address, port);
-    print('Server listening on ${address.address}:$port');
+    print('Listening on http://${_server?.address.address}:${_server?.port}');
 
     _server!.listen((client) {
       client.listen(

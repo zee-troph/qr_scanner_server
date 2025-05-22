@@ -8,6 +8,8 @@ import '../lib/utils/socket_listener.dart';
 /// QR sessions, and attendance records over WebSocket. {$ECUR3_PA55W0RD}
 void main(List<String> args) async {
   final dbUrl = Platform.environment['DATABASE_URL'];
+  final port = int.parse(Platform.environment['PORT'] ?? '8080');
+
   if (dbUrl == null) {
     print('DATABASE_URL is not set.');
     return;
@@ -33,7 +35,7 @@ void main(List<String> args) async {
   final manager = SocketManager();
   await manager.startServer(
     address: InternetAddress.anyIPv4,
-    port: 8080,
+    port: port,
   );
   print('[Socket] Server started on 0.0.0.0:8080');
 
