@@ -1,6 +1,8 @@
 # Start from the Dart SDK image
 FROM dart:stable AS build
 
+RUN apt-get update && apt-get install -y sqlite3 libsqlite3-dev
+
 # Resolve app dependencies.
 WORKDIR /app
 COPY pubspec.* ./
