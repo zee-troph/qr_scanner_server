@@ -37,6 +37,7 @@ void main(List<String> args) async {
     address: InternetAddress.anyIPv4,
     port: port,
   );
+  await manager.startHttpServer(db, port: 8081);
   print('[Socket] Server started on 0.0.0.0:8080');
 
   manager.processPayload = (payload, socket) {
