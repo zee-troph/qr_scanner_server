@@ -19,28 +19,32 @@ bool checkBasicAuth(HttpRequest request) {
   return parts[0] == authUser && parts[1] == authPass;
 }
 
-/// A class to manage socket communication over LAN, listening and sending JSON packets,
-/// and awaiting responses by message ID.
+String _log(String level, String message) {
+  final time = DateTime.now().toIso8601String();
+  return '[$time] [$level] $message';
+}
+
 class SocketManager {
   HttpServer? _server;
-  WebSocket? _client;
   final _completers = <String, Completer>{};
 
-  /// Payload factory override if needed
   dynamic Function(Map<String, dynamic>)? payloadFactory;
 
-  /// Start listening as a server on [address] and [port].
   Future<void> startServer(PostgreSQLConnection db, int port) async {
     _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
-    print('Server listening on port $port');
+    print(_log('INFO', 'Server listening on port $port'));
 
     await for (HttpRequest request in _server!) {
       try {
         if (WebSocketTransformer.isUpgradeRequest(request)) {
           final socket = await WebSocketTransformer.upgrade(request);
+          print(_log('INFO',
+              'WebSocket client connected from ${request.connectionInfo?.remoteAddress.address}'));
           _handleWebSocket(socket);
         } else if (request.uri.path == '/admins') {
           if (!checkBasicAuth(request)) {
+            print(_log('WARN',
+                'Unauthorized access attempt to /admins from ${request.connectionInfo?.remoteAddress.address}'));
             request.response.statusCode = HttpStatus.unauthorized;
             request.response.headers.set(
               HttpHeaders.wwwAuthenticateHeader,
@@ -51,19 +55,27 @@ class SocketManager {
           }
 
           if (request.method == 'GET') {
+            print(_log('INFO',
+                'Serving /admins GET request from ${request.connectionInfo?.remoteAddress.address}'));
             await _serveAdminsPage(request, db);
           } else if (request.method == 'POST') {
+            print(_log('INFO',
+                'Processing /admins POST request from ${request.connectionInfo?.remoteAddress.address}'));
             await _handleAdminsApproval(request, db);
           } else {
+            print(_log(
+                'WARN', 'Method not allowed: ${request.method} at /admins'));
             request.response.statusCode = HttpStatus.methodNotAllowed;
             await request.response.close();
           }
         } else {
+          print(_log('WARN',
+              '404 Not Found for ${request.method} ${request.uri.path} from ${request.connectionInfo?.remoteAddress.address}'));
           request.response.statusCode = HttpStatus.notFound;
           await request.response.close();
         }
       } catch (e, st) {
-        print('[HTTP] Error: $e\n$st');
+        print(_log('ERROR', '[HTTP] Error: $e\n$st'));
         try {
           request.response.statusCode = HttpStatus.internalServerError;
           request.response.write('Internal server error');
@@ -74,17 +86,18 @@ class SocketManager {
   }
 
   void _handleWebSocket(WebSocket socket) {
-    print('WebSocket client connected');
     socket.listen(
       (data) {
         if (data is String) {
+          print(_log('DEBUG', 'Received text data from WebSocket client'));
           _handleData(data, socket);
         } else if (data is Uint8List) {
+          print(_log('DEBUG', 'Received binary data from WebSocket client'));
           _handleData(utf8.decode(data), socket);
         }
       },
-      onDone: () => print('WebSocket client disconnected'),
-      onError: (e) => print('WebSocket error: $e'),
+      onDone: () => print(_log('INFO', 'WebSocket client disconnected')),
+      onError: (e) => print(_log('ERROR', 'WebSocket error: $e')),
     );
   }
 
@@ -93,6 +106,7 @@ class SocketManager {
     final results = await db.mappedResultsQuery(
       'SELECT id, name, is_approved FROM admins ORDER BY name',
     );
+    print(_log('DEBUG', 'Fetched admins list from DB for /admins page'));
 
     final buffer = StringBuffer();
     buffer.writeln('<html><body>');
@@ -116,11 +130,14 @@ class SocketManager {
       ..headers.contentType = ContentType.html
       ..write(buffer.toString());
     await request.response.close();
+    print(_log('INFO',
+        'Served /admins page to ${request.connectionInfo?.remoteAddress.address}'));
   }
 
   Future<void> _handleAdminsApproval(
       HttpRequest request, PostgreSQLConnection db) async {
     final content = await utf8.decoder.bind(request).join();
+    print(_log('DEBUG', 'Received admin approval form submission: $content'));
     final params = Uri.splitQueryString(content);
 
     final approvedRaw = params['approved'];
@@ -140,15 +157,16 @@ class SocketManager {
         'UPDATE admins SET is_approved = @isApproved WHERE id = @id',
         substitutionValues: {'isApproved': isApproved, 'id': adminId},
       );
+      print(_log('DEBUG', 'Admin $adminId approval set to $isApproved'));
     }
 
     request.response
       ..statusCode = HttpStatus.seeOther
       ..headers.set('Location', '/admins');
     await request.response.close();
+    print(_log('INFO', 'Processed admin approvals and redirected'));
   }
 
-  /// Reply to a message, ensuring the 'inReplyTo' field is set.
   void replyTo(
     Map<String, dynamic> request,
     Map<String, dynamic> response,
@@ -159,42 +177,42 @@ class SocketManager {
       response['inReplyTo'] = replyId;
     }
     final data = jsonEncode(response);
-    print("Replying data: $data");
+    print(_log('INFO', 'Sending reply to messageId=$replyId: $data'));
     socket.add(data);
   }
 
-  /// Internal handler for incoming data.
   void _handleData(String data, WebSocket socket) {
     try {
-      print("Received data: $data");
+      print(_log('DEBUG', 'Received data: $data'));
       final payload = jsonDecode(data) as Map<String, dynamic>;
 
-      // If server sent a response to a request
       if (payload.containsKey('inReplyTo')) {
         final replyId = payload['inReplyTo'] as String;
         final completer = _completers.remove(replyId);
-        completer?.complete(payload);
+        if (completer != null) {
+          completer.complete(payload);
+          print(_log('INFO', 'Completed future for messageId=$replyId'));
+        } else {
+          print(_log('WARN', 'No completer found for messageId=$replyId'));
+        }
         return;
       }
 
-      // Otherwise process normally
       if (processPayload != null) {
         processPayload!(payload, socket);
       } else {
-        print('No processPayload function defined.');
+        print(_log(
+            'WARN', 'No processPayload function defined to handle message'));
       }
     } catch (e) {
-      print('Invalid JSON received: $e');
+      print(_log('ERROR', 'Invalid JSON received: $e'));
     }
   }
 
-  /// Override this to handle incoming messages.
-  /// To reply, include 'inReplyTo': received messageId
   void Function(dynamic payload, WebSocket socket)? processPayload;
 
-  /// Gracefully close sockets.
   Future<void> dispose() async {
-    await _client?.close();
     await _server?.close();
+    print(_log('INFO', 'SocketManager disposed and connections closed'));
   }
 }

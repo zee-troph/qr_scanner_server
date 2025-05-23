@@ -33,11 +33,6 @@ void main(List<String> args) async {
   _createSchema(db);
 
   final manager = SocketManager();
-  await manager.startServer(
-    db,
-    port,
-  );
-
   manager.processPayload = (payload, socket) {
     print('[Payload] Received: $payload');
     if (payload is! Map<String, dynamic> || !payload.containsKey('command'))
@@ -71,8 +66,10 @@ void main(List<String> args) async {
         print('[Error] Unknown command:  ${payload['command']}');
     }
   };
-
-  print('[Server] Server running on port 8080');
+  await manager.startServer(
+    db,
+    port,
+  );
 }
 
 /// --- UTILITY FUNCTIONS ---
