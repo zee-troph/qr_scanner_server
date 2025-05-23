@@ -2,8 +2,23 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-
+import 'package:postgres/postgres.dart';
 import 'package:uuid/uuid.dart';
+
+const String authUser = 'VickyE2';
+const String authPass = 'ThisIsAV3RYL0ngP4ssw0rd';
+
+bool checkBasicAuth(HttpRequest request) {
+  final authHeader = request.headers.value(HttpHeaders.authorizationHeader);
+  if (authHeader == null || !authHeader.startsWith('Basic ')) return false;
+
+  final encoded = authHeader.substring(6);
+  final decoded = utf8.decode(base64.decode(encoded));
+  final parts = decoded.split(':');
+  if (parts.length != 2) return false;
+
+  return parts[0] == authUser && parts[1] == authPass;
+}
 
 /// A class to manage socket communication over LAN, listening and sending JSON packets,
 /// and awaiting responses by message ID.
@@ -33,14 +48,96 @@ class SocketManager {
     });
   }
 
-  /// Connect to a server at [host] and [port].
-  Future<void> connectToServer(String host, int port) async {
-    _client = await Socket.connect(host, port);
-    _client!.listen(
-      (data) => _handleData(data, _client!),
-      onDone: _client!.close,
-      onError: (e) => print('Client socket error: $e'),
-    );
+  /// Start listening as a server on [port].
+  Future<void> startHttpServer(PostgreSQLConnection db,
+      {int port = 8081}) async {
+    final server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+    print('[HTTP] Listening on port $port');
+
+    await for (HttpRequest request in server) {
+      try {
+        // Check authentication
+        if (!checkBasicAuth(request)) {
+          request.response.statusCode = HttpStatus.unauthorized;
+          request.response.headers.set(
+            HttpHeaders.wwwAuthenticateHeader,
+            'Basic realm="Admin Area"',
+          );
+          await request.response.close();
+          continue;
+        }
+        if (request.method == 'GET' && request.uri.path == '/admins') {
+          // Query admins from DB
+          final results = await db.mappedResultsQuery(
+            'SELECT id, name, is_approved FROM admins ORDER BY name',
+          );
+
+          // Build HTML page with a form
+          final buffer = StringBuffer();
+          buffer.writeln('<html><body>');
+          buffer.writeln('<h1>Admin Approval List</h1>');
+          buffer.writeln('<form method="POST" action="/admins">');
+
+          for (var row in results) {
+            final admin = row['admins']!;
+            final id = admin['id']!;
+            final name = admin['name']!;
+            final approved = (admin['is_approved'] == true) ? 'checked' : '';
+            buffer.writeln(
+                '<input type="checkbox" name="approved" value="$id" $approved> $name<br>');
+          }
+
+          buffer.writeln('<br><button type="submit">Save</button>');
+          buffer.writeln('</form></body></html>');
+
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.html
+            ..write(buffer.toString());
+          await request.response.close();
+        } else if (request.method == 'POST' && request.uri.path == '/admins') {
+          // Read and parse form data
+          final content = await utf8.decoder.bind(request).join();
+          final params = Uri.splitQueryString(content);
+
+          // params['approved'] can be a single string or comma-separated list
+          final approvedIdsRaw = params['approved'];
+          final approvedIds = <String>{};
+          if (approvedIdsRaw != null) {
+            approvedIds.addAll(approvedIdsRaw.split(','));
+          }
+
+          // Fetch all admin ids
+          final allAdminsResult =
+              await db.mappedResultsQuery('SELECT id FROM admins');
+          final allAdminIds =
+              allAdminsResult.map((r) => r['admins']!['id']!).toList();
+
+          // Update each admin's is_approved flag depending on checkbox presence
+          for (final adminId in allAdminIds) {
+            final isApproved = approvedIds.contains(adminId) ? true : false;
+            await db.execute(
+              'UPDATE admins SET is_approved = @isApproved WHERE id = @id',
+              substitutionValues: {'isApproved': isApproved, 'id': adminId},
+            );
+          }
+
+          // Redirect back to GET /admins page
+          request.response.statusCode = HttpStatus.seeOther;
+          request.response.headers.set('Location', '/admins');
+          await request.response.close();
+        } else {
+          // 404 Not Found for others
+          request.response.statusCode = HttpStatus.notFound;
+          await request.response.close();
+        }
+      } catch (e, st) {
+        print('[HTTP] Error: $e\n$st');
+        request.response.statusCode = HttpStatus.internalServerError;
+        request.response.write('Internal server error');
+        await request.response.close();
+      }
+    }
   }
 
   /// Send a message and optionally await a response.

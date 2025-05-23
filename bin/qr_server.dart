@@ -95,6 +95,7 @@ Future<void> _createSchema(PostgreSQLConnection db) async {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       password TEXT NOT NULL
+      is_approved BOOLEAN DEFAULT FALSE
     );
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
@@ -240,6 +241,37 @@ Future<void> _handleLogin(
     substitutionValues: {'id': id, 'password': hashed},
   );
 
+  if (role == 'admin') {
+    await db.execute(
+      '''
+      SELECT is_approved FROM admins WHERE id = @id
+      ''',
+      substitutionValues: {'id': id},
+    );
+
+    if (result.isEmpty) {
+      m.replyTo(
+          p,
+          {
+            'command': 'login_ack',
+            'status': 'failed',
+            'reason': 'This user is not registered',
+          },
+          socket);
+      return;
+    } else if (result.first['is_approved'] == false) {
+      m.replyTo(
+          p,
+          {
+            'command': 'login_ack',
+            'status': 'failed',
+            'reason': 'You are not approved yet',
+          },
+          socket);
+      return;
+    }
+  }
+
   if (result.isNotEmpty) {
     final row = result.first['${role}s']!;
     m.replyTo(
@@ -258,7 +290,7 @@ Future<void> _handleLogin(
         {
           'command': 'login_ack',
           'status': 'failed',
-          'reason': 'invalid_credentials',
+          'reason': 'Your credentials are invalid',
         },
         socket);
   }
