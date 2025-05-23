@@ -94,7 +94,7 @@ Future<void> _createSchema(PostgreSQLConnection db) async {
     CREATE TABLE IF NOT EXISTS admins (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      password TEXT NOT NULL
+      password TEXT NOT NULL,
       is_approved BOOLEAN DEFAULT FALSE
     );
     CREATE TABLE IF NOT EXISTS sessions (
