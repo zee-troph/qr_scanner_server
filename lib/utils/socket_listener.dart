@@ -196,12 +196,15 @@ class SocketManager {
     if (replyId != null) {
       response['inReplyTo'] = replyId;
     }
-    socket.add(jsonEncode(response));
+    final data = jsonEncode(response);
+    print("Replying data: $data");
+    socket.add(data);
   }
 
   /// Internal handler for incoming data.
   void _handleData(String data, WebSocket socket) {
     try {
+      print("Received data: $data");
       final payload = jsonDecode(data) as Map<String, dynamic>;
 
       // If server sent a response to a request
