@@ -212,6 +212,7 @@ Future<void> _handleLogin(
   final role = p['role'] as String;
   final hashed = _hashPassword(password);
 
+  // Query user/admin info by id and password
   final result = await db.mappedResultsQuery(
     '''
     SELECT id, name FROM ${role}s
@@ -220,25 +221,40 @@ Future<void> _handleLogin(
     substitutionValues: {'id': id, 'password': hashed},
   );
 
+  if (result.isEmpty) {
+    // User not found or password mismatch
+    m.replyTo(
+        p,
+        {
+          'command': 'login_ack',
+          'status': 'failed',
+          'reason': 'Your credentials are invalid or user not found',
+        },
+        socket);
+    return;
+  }
+
+  // If role is admin, check if approved
   if (role == 'admin') {
-    await db.execute(
-      '''
-      SELECT is_approved FROM admins WHERE id = @id
-      ''',
+    final approvalResult = await db.mappedResultsQuery(
+      'SELECT is_approved FROM admins WHERE id = @id',
       substitutionValues: {'id': id},
     );
 
-    if (result.isEmpty) {
+    if (approvalResult.isEmpty) {
       m.replyTo(
           p,
           {
             'command': 'login_ack',
             'status': 'failed',
-            'reason': 'This user is not registered',
+            'reason': 'Admin user not found',
           },
           socket);
       return;
-    } else if (result.first['is_approved'] == false) {
+    }
+
+    final isApproved = approvalResult.first['admins']?['is_approved'];
+    if (isApproved == null || isApproved == false) {
       m.replyTo(
           p,
           {
@@ -251,28 +267,18 @@ Future<void> _handleLogin(
     }
   }
 
-  if (result.isNotEmpty) {
-    final row = result.first['${role}s']!;
-    m.replyTo(
-        p,
-        {
-          'command': 'login_ack',
-          'status': 'success',
-          'id': row['id'],
-          'name': row['name'],
-          'role': role,
-        },
-        socket);
-  } else {
-    m.replyTo(
-        p,
-        {
-          'command': 'login_ack',
-          'status': 'failed',
-          'reason': 'Your credentials are invalid',
-        },
-        socket);
-  }
+  // All checks passed, send success response
+  final row = result.first['${role}s']!;
+  m.replyTo(
+      p,
+      {
+        'command': 'login_ack',
+        'status': 'success',
+        'id': row['id'],
+        'name': row['name'],
+        'role': role,
+      },
+      socket);
 }
 
 Future<void> _handleCreateSession(
@@ -330,7 +336,7 @@ Future<void> _handleAttendance(
         p,
         {
           'command': 'attendance_nok',
-          'reason': 'invalid_session',
+          'reason': 'Invalid Session. That is not a valid Attendance QR code',
         },
         socket);
     return;
@@ -338,7 +344,13 @@ Future<void> _handleAttendance(
 
   final expiresTs = DateTime.parse(sel.first['sessions']!['expires']);
   if (DateTime.now().isAfter(expiresTs)) {
-    m.replyTo(p, {'command': 'attendance_nok', 'reason': 'expired'}, socket);
+    m.replyTo(
+        p,
+        {
+          'command': 'attendance_nok',
+          'reason': 'That Attendance has already Expired...'
+        },
+        socket);
     return;
   }
 
@@ -355,7 +367,8 @@ Future<void> _handleAttendance(
         p,
         {
           'command': 'attendance_nok',
-          'reason': 'You have already signed the attendance previously',
+          'reason':
+              'You have already signed that attendance... You can only sign once',
         },
         socket);
     return;
