@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:postgres/postgres.dart';
-import 'package:uuid/uuid.dart';
 
 const String authUser = 'VickyE2';
 const String authPass = 'ThisIsAV3RYL0ngP4ssw0rd';
@@ -26,7 +25,6 @@ class SocketManager {
   HttpServer? _server;
   WebSocket? _client;
   final _completers = <String, Completer>{};
-  final _uuid = Uuid();
 
   /// Payload factory override if needed
   dynamic Function(Map<String, dynamic>)? payloadFactory;
@@ -148,42 +146,6 @@ class SocketManager {
       ..statusCode = HttpStatus.seeOther
       ..headers.set('Location', '/admins');
     await request.response.close();
-  }
-
-  /// Send a message and optionally await a response.
-  Future<dynamic> sendMessage(
-    Map<String, dynamic> message, {
-    bool awaitResponse = false,
-  }) {
-    final id = _uuid.v4().toString();
-    message['messageId'] = id;
-    final jsonString = jsonEncode(message);
-    _client?.add(jsonString);
-    if (awaitResponse) {
-      final completer = Completer<dynamic>();
-      _completers[id] = completer;
-      return completer.future;
-    } else {
-      return Future.value(null);
-    }
-  }
-
-  /// Send a message and optionally await a response.
-  Future<dynamic> sendMessageSrv(
-    Map<String, dynamic> message,
-    WebSocket sender, {
-    bool awaitResponse = false,
-  }) {
-    final id = _uuid.v4();
-    message['messageId'] = id;
-    sender.add(jsonEncode(message));
-    if (awaitResponse) {
-      final completer = Completer<dynamic>();
-      _completers[id] = completer;
-      return completer.future;
-    } else {
-      return Future.value(null);
-    }
   }
 
   /// Reply to a message, ensuring the 'inReplyTo' field is set.
