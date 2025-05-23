@@ -80,10 +80,9 @@ class SocketManager {
     socket.listen(
       (data) {
         if (data is String) {
-          _handleData(jsonEncode(data), socket);
+          _handleData(data, socket);
         } else if (data is Uint8List) {
-          _handleData(
-              jsonEncode(utf8.decode(Uint8List.fromList(data))), socket);
+          _handleData(utf8.decode(data), socket);
         }
       },
       onDone: () => print('WebSocket client disconnected'),
