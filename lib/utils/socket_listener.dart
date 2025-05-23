@@ -80,9 +80,10 @@ class SocketManager {
     socket.listen(
       (data) {
         if (data is String) {
-          _handleData(utf8.encode(data), socket);
-        } else if (data is List<int>) {
-          _handleData(Uint8List.fromList(data), socket);
+          _handleData(jsonEncode(data), socket);
+        } else if (data is Uint8List) {
+          _handleData(
+              jsonEncode(utf8.decode(Uint8List.fromList(data))), socket);
         }
       },
       onDone: () => print('WebSocket client disconnected'),
@@ -201,10 +202,9 @@ class SocketManager {
   }
 
   /// Internal handler for incoming data.
-  void _handleData(Uint8List data, WebSocket socket) {
-    final raw = utf8.decode(data);
+  void _handleData(String data, WebSocket socket) {
     try {
-      final payload = jsonDecode(raw) as Map<String, dynamic>;
+      final payload = jsonDecode(data) as Map<String, dynamic>;
 
       // If server sent a response to a request
       if (payload.containsKey('inReplyTo')) {
