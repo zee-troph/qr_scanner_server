@@ -180,6 +180,8 @@ class SocketManager {
       // Otherwise process normally
       if (processPayload != null) {
         processPayload!(payload, socket);
+      } else {
+        print('No processPayload function defined.');
       }
     } catch (e) {
       print('Invalid JSON received: $e');
