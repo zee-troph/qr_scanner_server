@@ -24,7 +24,7 @@ bool checkBasicAuth(HttpRequest request) {
 /// and awaiting responses by message ID.
 class SocketManager {
   HttpServer? _server;
-  Socket? _client;
+  WebSocket? _client;
   final _completers = <String, Completer>{};
   final _uuid = Uuid();
 
@@ -158,8 +158,7 @@ class SocketManager {
     final id = _uuid.v4().toString();
     message['messageId'] = id;
     final jsonString = jsonEncode(message);
-    final data = utf8.encode(jsonString);
-    _client?.add(data);
+    _client?.add(jsonString);
     if (awaitResponse) {
       final completer = Completer<dynamic>();
       _completers[id] = completer;
@@ -177,7 +176,7 @@ class SocketManager {
   }) {
     final id = _uuid.v4();
     message['messageId'] = id;
-    sender.add(utf8.encode(jsonEncode(message)));
+    sender.add(jsonEncode(message));
     if (awaitResponse) {
       final completer = Completer<dynamic>();
       _completers[id] = completer;
@@ -197,7 +196,7 @@ class SocketManager {
     if (replyId != null) {
       response['inReplyTo'] = replyId;
     }
-    socket.add(utf8.encode(jsonEncode(response)));
+    socket.add(jsonEncode(response));
   }
 
   /// Internal handler for incoming data.
