@@ -34,11 +34,9 @@ void main(List<String> args) async {
 
   final manager = SocketManager();
   await manager.startServer(
-    address: InternetAddress.anyIPv4,
-    port: port,
+    db,
+    port,
   );
-  await manager.startHttpServer(db, port: 8081);
-  print('[Socket] Server started on 0.0.0.0:8080');
 
   manager.processPayload = (payload, socket) {
     print('[Payload] Received: $payload');
@@ -123,7 +121,7 @@ Future<void> _createSchema(PostgreSQLConnection db) async {
 Future<void> _handleRequestSessions(
   PostgreSQLConnection db,
   Map<String, dynamic> p,
-  Socket socket,
+  WebSocket socket,
   SocketManager m,
 ) async {
   final adminId = p['admin_id'] as String;
@@ -149,7 +147,7 @@ Future<void> _handleRequestSessions(
 Future<void> _handleRequestAttendances(
   PostgreSQLConnection db,
   Map<String, dynamic> p,
-  Socket socket,
+  WebSocket socket,
   SocketManager m,
 ) async {
   final sessionId = p['session_id'] as String;
@@ -180,7 +178,7 @@ Future<void> _handleRequestAttendances(
 Future<void> _handleCreateUser(
   PostgreSQLConnection db,
   Map<String, dynamic> p,
-  Socket socket,
+  WebSocket socket,
   SocketManager m,
 ) async {
   final id = p['id'] as String;
@@ -203,7 +201,7 @@ Future<void> _handleCreateUser(
 Future<void> _handleCreateAdmin(
   PostgreSQLConnection db,
   Map<String, dynamic> p,
-  Socket socket,
+  WebSocket socket,
   SocketManager m,
 ) async {
   final id = p['id'] as String;
@@ -226,7 +224,7 @@ Future<void> _handleCreateAdmin(
 Future<void> _handleLogin(
   PostgreSQLConnection db,
   Map<String, dynamic> p,
-  Socket socket,
+  WebSocket socket,
   SocketManager m,
 ) async {
   final id = p['id'] as String;
@@ -300,7 +298,7 @@ Future<void> _handleLogin(
 Future<void> _handleCreateSession(
   PostgreSQLConnection db,
   Map<String, dynamic> p,
-  Socket socket,
+  WebSocket socket,
   SocketManager m,
 ) async {
   final sessionId = p['session_id'] as String;
@@ -335,7 +333,7 @@ Future<void> _handleCreateSession(
 Future<void> _handleAttendance(
   PostgreSQLConnection db,
   Map<String, dynamic> p,
-  Socket socket,
+  WebSocket socket,
   SocketManager m,
 ) async {
   final userId = p['user_id'] as String;
