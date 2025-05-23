@@ -43,6 +43,9 @@ void main(List<String> args) async {
     if (payload is! Map<String, dynamic> || !payload.containsKey('command'))
       return;
     switch (payload['command'] as String) {
+      case 'ping':
+        manager.replyTo(payload, {'command': 'pong'}, socket);
+        break;
       case 'create_user':
         _handleCreateUser(db, payload, socket, manager);
         break;
