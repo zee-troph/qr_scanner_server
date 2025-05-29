@@ -214,8 +214,8 @@ Future<void> _handleGeneratePdf(
   final sessionId = p['session_id'] as String;
 
   // Fetch session info
-  final sessionInfoQuery = await db.mappedResultsQuery('''
-    SELECT s.code, s.expires, a.name as admin_name
+  final sessionInfoQuery = await db.query('''
+    SELECT s.code, s.expires, a.name
     FROM sessions s
     JOIN admins a ON a.id = s.admin_id
     WHERE s.id = @sessionId
@@ -229,13 +229,13 @@ Future<void> _handleGeneratePdf(
 
   final row = sessionInfoQuery[0];
   final sessionInfo = {
-    'code': row['s']?['code'] ?? 'UNKNOWN',
-    'expires': row['s']?['expires'] ?? 'UNKNOWN',
-    'admin_name': row['a']?['name'] ?? 'UNKNOWN',
+    'code': row[0] ?? 'UNKNOWN',
+    'expires': row[1]?.toString() ?? 'UNKNOWN',
+    'admin_name': row[2] ?? 'UNKNOWN',
   };
 
   // Get attendances
-  final result = await db.mappedResultsQuery('''
+  final result = await db.query('''
     SELECT a.user_id, a.qr_primary_key, a.timestamp, u.name
     FROM attendances a
     JOIN users u ON u.id = a.user_id
@@ -244,10 +244,10 @@ Future<void> _handleGeneratePdf(
 
   final attendanceData = result
       .map((row) => {
-            'user_id': row['a']?['user_id'] ?? 'UNKNOWN',
-            'name': row['u']?['name'] ?? 'UNKNOWN',
-            'qr_primary_key': row['a']?['qr_primary_key'] ?? 'UNKNOWN',
-            'timestamp': row['a']?['timestamp']?.toString() ?? 'UNKNOWN',
+            'user_id': row[0] ?? 'UNKNOWN',
+            'qr_primary_key': row[1] ?? 'UNKNOWN',
+            'timestamp': row[2]?.toString() ?? 'UNKNOWN',
+            'name': row[3] ?? 'UNKNOWN',
           })
       .toList();
 
