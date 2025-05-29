@@ -75,7 +75,7 @@ Future<void> createSchema(PostgreSQLConnection db) async {
       admin_id TEXT NOT NULL,
       code TEXT NOT NULL,
       expires TEXT NOT NULL,
-      FOREIGN KEY(admin_id) REFERENCES users(id)
+      FOREIGN KEY(admin_id) REFERENCES admins(id)
     );
     CREATE TABLE IF NOT EXISTS attendances (
       id SERIAL PRIMARY KEY,
