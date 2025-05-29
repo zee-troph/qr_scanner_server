@@ -9,3 +9,4 @@ dependencies:
   uuid: ^4.0.0
   postgres: ^2.5.4
   crypto: ^3.0.6
+  pdf: ^3.10.4

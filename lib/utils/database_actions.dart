@@ -3,6 +3,7 @@ import 'package:crypto/crypto.dart';
 import 'package:postgres/postgres.dart';
 import 'dart:convert';
 import 'socket_listener.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 void prepareServer(PostgreSQLConnection db, int port) async {
   print('[SERVER] Preparing server...');
@@ -17,6 +18,9 @@ void prepareServer(PostgreSQLConnection db, int port) async {
         break;
       case 'create_user':
         _handleCreateUser(db, payload, socket, manager);
+        break;
+      case 'gen_attendance_pdf':
+        _handleGeneratePdf(db, payload, socket, manager);
         break;
       case 'get_attendances':
         _handleRequestAttendances(db, payload, socket, manager);
@@ -197,6 +201,112 @@ Future<void> _handleCreateAdmin(
       {
         'command': 'create_admin_ack',
         'message': "Your request has been sent :D",
+      },
+      socket);
+}
+
+Future<void> _handleGeneratePdf(
+  PostgreSQLConnection db,
+  Map<String, dynamic> p,
+  WebSocket socket,
+  SocketManager m,
+) async {
+  final sessionId = p['session_id'] as String;
+
+  // Fetch session info
+  final sessionInfoQuery = await db.mappedResultsQuery('''
+    SELECT s.code, s.expires, a.name as admin_name
+    FROM sessions s
+    JOIN admins a ON a.id = s.admin_id
+    WHERE s.id = @sessionId
+  ''', substitutionValues: {'sessionId': sessionId});
+
+  if (sessionInfoQuery.isEmpty) {
+    m.replyTo(
+        p, {'command': 'pdf_error', 'error': 'Session not found'}, socket);
+    return;
+  }
+
+  final sessionInfo = {
+    'code': sessionInfoQuery[0]['s']!['code'],
+    'expires': sessionInfoQuery[0]['s']!['expires'],
+    'admin_name': sessionInfoQuery[0]['a']!['admin_name'],
+  };
+
+  // Get attendances
+  final result = await db.mappedResultsQuery('''
+    SELECT a.user_id, a.qr_primary_key, a.timestamp, u.name
+    FROM attendances a
+    JOIN users u ON u.id = a.user_id
+    WHERE a.session_id = @sessionId
+  ''', substitutionValues: {'sessionId': sessionId});
+
+  final attendanceData = result
+      .map((row) => {
+            'user_id': row['a']!['user_id'],
+            'name': row['u']!['name'],
+            'qr_primary_key': row['a']!['qr_primary_key'],
+            'timestamp': row['a']!['timestamp'],
+          })
+      .toList();
+
+  final pdf = pw.Document();
+  pdf.addPage(
+    pw.MultiPage(
+      build: (context) => [
+        pw.Text('Attendance Report',
+            style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 12),
+        pw.Text('Session Info:', style: pw.TextStyle(fontSize: 18)),
+        pw.Text('Code: ${sessionInfo['code']}'),
+        pw.Text('Admin: ${sessionInfo['admin_name']}'),
+        pw.Text('Expires: ${sessionInfo['expires']}'),
+        pw.SizedBox(height: 20),
+        pw.TableHelper.fromTextArray(
+          headers: ['User ID', 'Name', 'QR Key', 'Timestamp'],
+          data: attendanceData
+              .map((row) => [
+                    row['user_id'],
+                    row['name'],
+                    row['qr_primary_key'],
+                    row['timestamp'],
+                  ])
+              .toList(),
+        )
+      ],
+    ),
+  );
+
+  final bytes = await pdf.save();
+  const chunkSize = 16000; // 16 KB
+  final totalChunks = (bytes.length / chunkSize).ceil();
+  final fileId = sessionId; // can be UUID or sessionId
+
+  for (var i = 0; i < totalChunks; i++) {
+    final start = i * chunkSize;
+    final end =
+        (start + chunkSize < bytes.length) ? start + chunkSize : bytes.length;
+    final chunk = base64Encode(bytes.sublist(start, end));
+
+    m.replyTo(
+        p,
+        {
+          'command': 'pdf_chunk',
+          'file_id': fileId,
+          'chunk_index': i,
+          'total_chunks': totalChunks,
+          'data': chunk,
+        },
+        socket);
+  }
+
+  // Optionally send a final signal
+  m.replyTo(
+      p,
+      {
+        'command': 'pdf_done',
+        'file_id': fileId,
+        'file_name': 'attendance_report_$sessionId.pdf',
       },
       socket);
 }
