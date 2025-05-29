@@ -227,22 +227,11 @@ Future<void> _handleGeneratePdf(
     return;
   }
 
-  if (sessionInfoQuery.isEmpty ||
-      sessionInfoQuery.first['s'] == null ||
-      sessionInfoQuery.first['a'] == null) {
-    m.replyTo(
-      p,
-      {'command': 'pdf_error', 'error': 'Session or admin not found'},
-      socket,
-    );
-    return;
-  }
-
   final row = sessionInfoQuery[0];
   final sessionInfo = {
-    'code': row['s']?['code'] ?? 'UNKNOWN',
-    'expires': row['s']?['expires'] ?? 'UNKNOWN',
-    'admin_name': row['a']?['admin_name'] ?? 'UNKNOWN',
+    'code': row['code'] ?? 'UNKNOWN',
+    'expires': row['expires'] ?? 'UNKNOWN',
+    'admin_name': row['admin_name'] ?? 'UNKNOWN',
   };
 
   // Get attendances
