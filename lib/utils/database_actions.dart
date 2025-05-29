@@ -244,10 +244,10 @@ Future<void> _handleGeneratePdf(
 
   final attendanceData = result
       .map((row) => {
-            'user_id': row['a']!['user_id'],
-            'name': row['u']!['name'],
-            'qr_primary_key': row['a']!['qr_primary_key'],
-            'timestamp': row['a']!['timestamp'],
+            'user_id': row['user_id'] ?? 'UNKNOWN',
+            'name': row!['name'] ?? 'UNKNOWN',
+            'qr_primary_key': row['qr_primary_key'] ?? 'UNKNOWN',
+            'timestamp': row['timestamp'] ?? 'UNKNOWN',
           })
       .toList();
 
