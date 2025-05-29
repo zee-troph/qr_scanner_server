@@ -229,9 +229,9 @@ Future<void> _handleGeneratePdf(
 
   final row = sessionInfoQuery[0];
   final sessionInfo = {
-    'code': row['code'] ?? 'UNKNOWN',
-    'expires': row['expires'] ?? 'UNKNOWN',
-    'admin_name': row['admin_name'] ?? 'UNKNOWN',
+    'code': row['s']?['code'] ?? 'UNKNOWN',
+    'expires': row['s']?['expires'] ?? 'UNKNOWN',
+    'admin_name': row['a']?['name'] ?? 'UNKNOWN',
   };
 
   // Get attendances
@@ -244,10 +244,10 @@ Future<void> _handleGeneratePdf(
 
   final attendanceData = result
       .map((row) => {
-            'user_id': row['user_id'] ?? 'UNKNOWN',
-            'name': row!['name'] ?? 'UNKNOWN',
-            'qr_primary_key': row['qr_primary_key'] ?? 'UNKNOWN',
-            'timestamp': row['timestamp'] ?? 'UNKNOWN',
+            'user_id': row['a']?['user_id'] ?? 'UNKNOWN',
+            'name': row['u']?['name'] ?? 'UNKNOWN',
+            'qr_primary_key': row['a']?['qr_primary_key'] ?? 'UNKNOWN',
+            'timestamp': row['a']?['timestamp']?.toString() ?? 'UNKNOWN',
           })
       .toList();
 
