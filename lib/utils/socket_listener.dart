@@ -107,24 +107,56 @@ class SocketManager {
       'SELECT id, name, is_approved FROM admins ORDER BY name',
     );
     print(_log('DEBUG', 'Fetched admins list from DB for /admins page'));
-
     final buffer = StringBuffer();
-    buffer.writeln('<html><body>');
+    buffer.writeln('<html>');
+    buffer.writeln('<head>');
+    buffer.writeln('<title>Admin Approval List</title>');
+    buffer.writeln('<style>');
+    buffer.writeln(
+        'body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 20px; }');
+    buffer.writeln('h1 { color: #333; }');
+    buffer.writeln(
+        'table { width: 100%; border-collapse: collapse; margin-top: 20px; }');
+    buffer.writeln(
+        'th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }');
+    buffer.writeln('tr:hover { background-color: #f1f1f1; }');
+    buffer.writeln(
+        '.switch { position: relative; display: inline-block; width: 50px; height: 24px; }');
+    buffer.writeln('.switch input { opacity: 0; width: 0; height: 0; }');
+    buffer.writeln(
+        '.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }');
+    buffer.writeln(
+        '.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }');
+    buffer.writeln('input:checked + .slider { background-color: #4CAF50; }');
+    buffer.writeln(
+        'input:checked + .slider:before { transform: translateX(26px); }');
+    buffer.writeln(
+        'button { margin-top: 20px; padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }');
+    buffer.writeln('button:hover { background-color: #45a049; }');
+    buffer.writeln('</style>');
+    buffer.writeln('</head>');
+    buffer.writeln('<body>');
     buffer.writeln('<h1>Admin Approval List</h1>');
     buffer.writeln('<form method="POST" action="/admins">');
-
+    buffer.writeln('<table>');
+    buffer.writeln('<tr><th>Name</th><th>Approved</th></tr>');
     for (var row in results) {
       final admin = row['admins']!;
       final id = admin['id']!;
       final name = admin['name']!;
       final approved = (admin['is_approved'] == true) ? 'checked' : '';
+      buffer.writeln('<tr>');
+      buffer.writeln('<td>$name</td>');
       buffer.writeln(
-          '<input type="checkbox" name="approved" value="$id" $approved> $name<br>');
+          '<td><label class="switch"><input type="checkbox" name="approved" value="$id" $approved><span class="slider"></span></label></td>');
+      buffer.writeln('</tr>');
     }
-
-    buffer.writeln('<br><button type="submit">Save</button>');
-    buffer.writeln('</form></body></html>');
-
+    buffer.writeln('</table>');
+    buffer.writeln('<button type="submit">Save</button>');
+    buffer.writeln('</form>');
+    buffer.writeln('</body>');
+    buffer.writeln('</html>');
+    print(_log('DEBUG', 'Generated HTML for /admins page'));
     request.response
       ..statusCode = HttpStatus.ok
       ..headers.contentType = ContentType.html

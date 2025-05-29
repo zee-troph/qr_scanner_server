@@ -13,7 +13,7 @@ void prepareServer(PostgreSQLConnection db, int port) async {
       return;
     switch (payload['command'] as String) {
       case 'ping':
-        manager.replyTo(payload, {'command': 'pong'}, socket);
+        manager.replyTo(payload, {'command': 'pong', 'status': 'ok'}, socket);
         break;
       case 'create_user':
         _handleCreateUser(db, payload, socket, manager);
