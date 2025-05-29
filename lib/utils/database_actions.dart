@@ -264,12 +264,12 @@ Future<void> _handleGeneratePdf(
         pw.Text('Expires: ${sessionInfo['expires']}'),
         pw.SizedBox(height: 20),
         pw.TableHelper.fromTextArray(
-          headers: ['User ID', 'Name', 'QR Key', 'Timestamp'],
+          headers: ['User ID', 'Name', 'Matric Number', 'Timestamp'],
           data: attendanceData
               .map((row) => [
                     row['user_id'],
                     row['name'],
-                    row['qr_primary_key'],
+                    row['qr_primary_key'].toString().replaceAll(sessionId, ""),
                     row['timestamp'],
                   ])
               .toList(),
