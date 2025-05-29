@@ -219,7 +219,7 @@ Future<void> _handleGeneratePdf(
     FROM sessions s
     JOIN admins a ON a.id = s.admin_id
     WHERE s.id = @sessionId
-  ''', substitutionValues: {'sessionId': sessionId});
+  ''', substitutionValues: {'sessionId': sessionId.trim()});
 
   if (sessionInfoQuery.isEmpty) {
     m.replyTo(
@@ -227,10 +227,22 @@ Future<void> _handleGeneratePdf(
     return;
   }
 
+  if (sessionInfoQuery.isEmpty ||
+      sessionInfoQuery.first['s'] == null ||
+      sessionInfoQuery.first['a'] == null) {
+    m.replyTo(
+      p,
+      {'command': 'pdf_error', 'error': 'Session or admin not found'},
+      socket,
+    );
+    return;
+  }
+
+  final row = sessionInfoQuery[0];
   final sessionInfo = {
-    'code': sessionInfoQuery[0]['s']!['code'],
-    'expires': sessionInfoQuery[0]['s']!['expires'],
-    'admin_name': sessionInfoQuery[0]['a']!['admin_name'],
+    'code': row['s']?['code'] ?? 'UNKNOWN',
+    'expires': row['s']?['expires'] ?? 'UNKNOWN',
+    'admin_name': row['a']?['admin_name'] ?? 'UNKNOWN',
   };
 
   // Get attendances
