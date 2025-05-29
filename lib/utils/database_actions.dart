@@ -196,7 +196,7 @@ Future<void> _handleCreateAdmin(
       p,
       {
         'command': 'create_admin_ack',
-        'message': "Your request has been accepted successfully :D"
+        'message': "Your request has been sent :D",
       },
       socket);
 }
