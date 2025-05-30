@@ -489,7 +489,7 @@ Future<void> _handleCreateSession(
   final sessionId = p['session_id'] as String;
   final adminId = p['admin_id'] as String;
   final code = p['code'] as String;
-  final expires = p['expires'] as String;
+  final expires = (DateTime.parse(p['expires'])).toUtc().toIso8601String();
 
   await db.execute(
     '''
@@ -541,8 +541,8 @@ Future<void> _handleAttendance(
     return;
   }
 
-  final expiresTs = DateTime.parse(sel.first['sessions']!['expires']);
-  if (DateTime.now().isAfter(expiresTs)) {
+  final expiresTs = DateTime.parse(sel.first['sessions']!['expires']).toUtc();
+  if (DateTime.now().toUtc().isAfter(expiresTs)) {
     m.replyTo(
         p,
         {
