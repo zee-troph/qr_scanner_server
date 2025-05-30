@@ -79,7 +79,7 @@ Future<void> createSchema(PostgreSQLConnection db) async {
       id TEXT PRIMARY KEY,
       admin_id TEXT NOT NULL,
       code TEXT NOT NULL,
-      expires TEXT NOT NULL,
+      expires TIMESTAMPTZ NOT NULL,
       FOREIGN KEY(admin_id) REFERENCES admins(id)
     );
     CREATE TABLE IF NOT EXISTS attendances (
@@ -375,7 +375,8 @@ Future<void> _handleGeneratePdf(
     final start = i * chunkSize;
     final end =
         (start + chunkSize < bytes.length) ? start + chunkSize : bytes.length;
-    final chunk = base64Encode(bytes.sublist(start, end));
+    final chunkBytes = bytes.sublist(start, end);
+    final chunk = base64.encode(chunkBytes);
 
     m.replyTo(
         p,
